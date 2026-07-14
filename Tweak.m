@@ -61,9 +61,10 @@ static NSDictionary* hook_environment(id self, SEL _cmd) {
 
 // 宸茬煡鐨?Qunar 鑷畾涔?Header 鍓嶇紑 (182澶?
 // Q-W-*, Q-R-*, Q-Device-*, Q-Env-* 绛夊彲鑳藉寘鍚秺鐙辨爣璁?static NSArray *suspiciousHeaderPrefixes(void) {
-    return @[@"Q-Device", @"Q-Env", @"Q-Root", @"Q-Jail", @"Q-Tamper",
-             @"Q-Sign", @"Q-Secure", @"Q-Verify", @"Q-Check", @"Q-Detect",
-             @"Q-Risk", @"Q-Trust"];
+    return [NSArray arrayWithObjects:
+            @"Q-Device", @"Q-Env", @"Q-Root", @"Q-Jail", @"Q-Tamper",
+            @"Q-Sign", @"Q-Secure", @"Q-Verify", @"Q-Check", @"Q-Detect",
+            @"Q-Risk", @"Q-Trust", nil];
 }
 
 static BOOL isSuspiciousHeader(NSString *field) {
@@ -121,7 +122,7 @@ static void hook_addValue(id self, SEL _cmd, NSString *value, NSString *field) {
 __attribute__((constructor))
 static void init() {
     @autoreleasepool {
-        NSLog(@"[QNBypass] v5.0 宸叉縺娲? 鏂囦欢+缃戠粶鍙屽睆钄?);
+        NSLog(@"[QNBypass] v5.0 active: file + network shield");
         
         // --- 鏂囦欢灞?---
         Class NSFM = NSClassFromString(@"NSFileManager");
