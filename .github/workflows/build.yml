@@ -1,4 +1,4 @@
-name: Build QunarJBBypass
+name: Build QunarTest
 on: [workflow_dispatch, push]
 
 jobs:
@@ -10,8 +10,12 @@ jobs:
       - name: Build
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -framework UIKit -o QunarJBBypass.dylib Tweak.m
-          ls -la QunarJBBypass.dylib
+          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -o Test.dylib Test.m
+          ls -la Test.dylib
+
+          # Also build main tweak
+          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -framework UIKit -o QunarTest.dylib Test.m
+          ls -la QunarTest.dylib
 
       - name: Sign
         run: |
@@ -19,18 +23,18 @@ jobs:
           curl -L -o /usr/local/bin/ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_macos_arm64 2>/dev/null || \
           curl -L -o /usr/local/bin/ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_macos_x86_64 2>/dev/null
           chmod +x /usr/local/bin/ldid 2>/dev/null || true
-          ldid -S QunarJBBypass.dylib 2>/dev/null || codesign -s - QunarJBBypass.dylib 2>/dev/null || echo \"sign skipped\"
+          ldid -S QunarTest.dylib 2>/dev/null || codesign -s - QunarTest.dylib 2>/dev/null || echo \"sign skipped\"
           echo \"Signed\"
 
       - name: Package
         run: |
           mkdir -p pkg/Library/MobileSubstrate/DynamicLibraries
-          cp QunarJBBypass.dylib pkg/Library/MobileSubstrate/DynamicLibraries/
-          echo '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array><key>Executables</key><array><string>QunariPhone_Cook_CM</string></array></dict></dict></plist>' > pkg/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist
-          tar czf QunarJBBypass.tar.gz pkg/
+          cp QunarTest.dylib pkg/Library/MobileSubstrate/DynamicLibraries/
+          echo '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array><key>Executables</key><array><string>QunariPhone_Cook_CM</string></array></dict></dict></plist>' > pkg/Library/MobileSubstrate/DynamicLibraries/QunarTest.plist
+          tar czf QunarTest.tar.gz pkg/
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: QunarJBBypass
-          path: QunarJBBypass.tar.gz
+          name: QunarTest
+          path: QunarTest.tar.gz
