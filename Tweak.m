@@ -12,8 +12,12 @@ static BOOL isJB(NSString *p){
 static BOOL(*orig_fep)(id,SEL,NSString*);
 static BOOL hook_fep(id s,SEL c,NSString*p){
     BOOL r=orig_fep(s,c,p);
-    if([p length]&&([p containsString:@"/var"]||[p containsString:@"Cydia"]))LOG(@"fileExists: %@ = %d -> NO",p,r);
-    return isJB(p)?NO:r;
+    if(isJB(p)){
+        // Proof that hook works
+        [[NSFileManager defaultManager] createFileAtPath:@"/tmp/QNB_BLOCKED" contents:[NSData data] attributes:nil];
+        return NO;
+    }
+    return r;
 }
 static BOOL(*orig_fepd)(id,SEL,NSString*,BOOL*);
 static BOOL hook_fepd(id s,SEL c,NSString*p,BOOL*d){if(isJB(p)){if(d)*d=NO;return NO;}return orig_fepd(s,c,p,d);}
@@ -34,6 +38,8 @@ static NSString* hook_idfv(id s,SEL c){LOG(@"IDFV -> random");return[[NSUUID UUI
 __attribute__((constructor))
 static void init(){@autoreleasepool{
     LOG(@"===== QunarBypass LOADED =====");
+    // Physical proof of execution
+    [[NSFileManager defaultManager] createFileAtPath:@"/tmp/QNB_LOADED" contents:[NSData data] attributes:nil];
     Class c=NSClassFromString(@"NSFileManager");
     if(c){Method m=class_getInstanceMethod(c,@selector(fileExistsAtPath:));if(m){orig_fep=(void*)method_getImplementation(m);method_setImplementation(m,(IMP)hook_fep);}
         m=class_getInstanceMethod(c,@selector(fileExistsAtPath:isDirectory:));if(m){orig_fepd=(void*)method_getImplementation(m);method_setImplementation(m,(IMP)hook_fepd);}}
