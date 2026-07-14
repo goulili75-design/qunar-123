@@ -16,7 +16,7 @@ jobs:
       - name: Build Spy Tweak  
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -framework UIKit -framework Security -o QunarSpy.dylib Spy.m
+          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -framework UIKit  -o QunarSpy.dylib Spy.m
           echo "Spy OK"
 
       - name: Package
