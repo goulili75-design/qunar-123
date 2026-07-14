@@ -10,26 +10,13 @@ jobs:
       - name: Build
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -o QunarJBBypass.dylib Tweak.m
+          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -framework UIKit -o QunarJBBypass.dylib Tweak.m
           ls -la QunarJBBypass.dylib
-
-          # Also build main tweak
-          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -framework UIKit -o QunarQunarJBBypass.dylib Tweak.m
-          ls -la QunarQunarJBBypass.dylib
-
-      - name: Sign
-        run: |
-          # Install ldid for code signing
-          curl -L -o /usr/local/bin/ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_macos_arm64 2>/dev/null || \
-          curl -L -o /usr/local/bin/ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_macos_x86_64 2>/dev/null
-          chmod +x /usr/local/bin/ldid 2>/dev/null || true
-          ldid -S QunarQunarJBBypass.dylib 2>/dev/null || codesign -s - QunarQunarJBBypass.dylib 2>/dev/null || echo \"sign skipped\"
-          echo \"Signed\"
 
       - name: Package
         run: |
           mkdir -p pkg/Library/MobileSubstrate/DynamicLibraries
-          cp QunarQunarJBBypass.dylib pkg/Library/MobileSubstrate/DynamicLibraries/
+          cp QunarJBBypass.dylib pkg/Library/MobileSubstrate/DynamicLibraries/
           echo '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array><key>Executables</key><array><string>QunariPhone_Cook_CM</string></array></dict></dict></plist>' > pkg/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist
           tar czf QunarJBBypass.tar.gz pkg/
 
