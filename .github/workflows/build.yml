@@ -9,28 +9,22 @@ jobs:
 
       - name: Compile
         run: |
+          set -x
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -arch arm64 \
+          echo "SDK: $SDK"
+          clang -v -arch arm64 \
             -isysroot "$SDK" \
             -miphoneos-version-min=15.0 \
             -dynamiclib \
             -framework Foundation \
-            -framework UIKit \
             -o QunarJBBypass.dylib \
-            Tweak.m
-          ls -la QunarJBBypass.dylib
-          echo "COMPILE OK"
-
-      - name: Package
-        run: |
-          mkdir -p QunarJBBypass/Library/MobileSubstrate/DynamicLibraries
-          cp QunarJBBypass.dylib QunarJBBypass/Library/MobileSubstrate/DynamicLibraries/
-          echo '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array></dict></dict></plist>' > QunarJBBypass/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist
-          tar czf QunarJBBypass.tar.gz QunarJBBypass/
-          ls -la QunarJBBypass.tar.gz
+            Tweak.m 2>&1
+          echo "EXIT: $?"
+          ls -la QunarJBBypass.dylib 2>/dev/null || echo "FAILED"
 
       - name: Upload
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: QunarJBBypass
-          path: QunarJBBypass.tar.gz
+          path: QunarJBBypass.dylib
