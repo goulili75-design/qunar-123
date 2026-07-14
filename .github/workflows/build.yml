@@ -10,47 +10,18 @@ jobs:
       - name: Compile
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -arch arm64 -x objective-c \
-            -isysroot "$SDK" \
-            -miphoneos-version-min=15.0 \
-            -dynamiclib \
-            -framework Foundation -framework UIKit \
-            -o QunarJBBypass.dylib \
-            Tweak.m 2>&1
-          echo "EXIT: $?"
-          file QunarJBBypass.dylib 2>/dev/null || echo "Compilation failed"
+          clang -arch arm64 -x objective-c -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -framework Foundation -lobjc -o QunarJBBypass.dylib Tweak.m
+          ls -la QunarJBBypass.dylib
 
-      - name: Sign
+      - name: Package (tar.gz)
         run: |
-          which ldid 2>/dev/null || brew install ldid 2>/dev/null || echo "ldid skipped"
-          ldid -S QunarJBBypass.dylib 2>/dev/null || echo "sign skipped"
-
-      - name: Package
-        run: |
-          which dpkg-deb 2>/dev/null || brew install dpkg 2>/dev/null
-          mkdir -p pkg/Library/MobileSubstrate/DynamicLibraries pkg/DEBIAN
-          cp QunarJBBypass.dylib pkg/Library/MobileSubstrate/DynamicLibraries/
-          cat > pkg/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array></dict></dict>
-          </plist>
-          EOF
-          cat > pkg/DEBIAN/control << 'EOF'
-          Package: com.qunarjbb
-          Name: QunarJBBypass
-          Version: 1.0
-          Architecture: iphoneos-arm64
-          Description: Qunar jailbreak bypass
-          Maintainer: qunar
-          Section: Tweaks
-          EOF
-          dpkg-deb -b pkg QunarJBBypass.deb
-          ls -la QunarJBBypass.deb
+          mkdir -p QunarJBBypass/Library/MobileSubstrate/DynamicLibraries
+          cp QunarJBBypass.dylib QunarJBBypass/Library/MobileSubstrate/DynamicLibraries/
+          echo '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array></dict></dict></plist>' > QunarJBBypass/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist
+          tar czf QunarJBBypass.tar.gz QunarJBBypass/
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: QunarJBBypass.deb
-          path: QunarJBBypass.deb
+          name: QunarJBBypass
+          path: QunarJBBypass.tar.gz
