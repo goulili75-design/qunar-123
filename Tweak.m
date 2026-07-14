@@ -82,7 +82,13 @@ static void init(){@autoreleasepool{
         m=class_getInstanceMethod(c,@selector(model));if(m){orig_model=(void*)method_getImplementation(m);method_setImplementation(m,(IMP)hook_model);}
         m=class_getInstanceMethod(c,@selector(identifierForVendor));if(m){orig_idfv=(void*)method_getImplementation(m);method_setImplementation(m,(IMP)hook_idfv);}}
     c=NSClassFromString(@"UIScreen");
-    if(c){Method m=class_getInstanceMethod([c mainScreen],@selector(bounds));if(m){orig_bounds=(void*)method_getImplementation(m);method_setImplementation(m,(IMP)hook_bounds);}
-        m=class_getInstanceMethod([c mainScreen],@selector(scale));if(m){orig_scale=(void*)method_getImplementation(m);method_setImplementation(m,(IMP)hook_scale);}}
+    if(c){
+        // Use instance method from mainScreen (safer - may be nil at load time)
+        id screen = [c mainScreen];
+        if(screen){
+            Method m=class_getInstanceMethod(c,@selector(bounds));if(m){orig_bounds=(void*)method_getImplementation(m);method_setImplementation(m,(IMP)hook_bounds);}
+            m=class_getInstanceMethod(c,@selector(scale));if(m){orig_scale=(void*)method_getImplementation(m);method_setImplementation(m,(IMP)hook_scale);}
+        }
+    }
     LOG(@"===== READY =====");
 }}
