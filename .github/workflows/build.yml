@@ -11,7 +11,9 @@ jobs:
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
           clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -framework UIKit -o QunarJBBypass.dylib Tweak.m
-          ls -la QunarJBBypass.dylib
+          # Also build bare minimal test
+          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -o Bare.dylib Bare.m
+          ls -la QunarJBBypass.dylib Bare.dylib
 
       - name: Package DEB
         run: |
