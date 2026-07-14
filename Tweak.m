@@ -1,4 +1,4 @@
-// QunarBypass v6.0 - Full device spoofing
+// QunarBypass v7.0 - Spoof + Log all device params
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
@@ -44,6 +44,7 @@ static NSDictionary* hook_fsa(id s,SEL c,NSString*p){NSDictionary*d=orig_fsa(s,c
 
 __attribute__((constructor))
 static void init(){@autoreleasepool{
+    NSLog(@"[QNBypass] v7.0 LOADED - logging all device params");
     Class NSFM=NSClassFromString(@"NSFileManager");
     if(NSFM){
         Method m=class_getInstanceMethod(NSFM,@selector(fileExistsAtPath:));
