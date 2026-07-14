@@ -1,4 +1,4 @@
-name: Build QunarJBBypass
+name: Build QunarJBBypass DEB
 on: [workflow_dispatch, push]
 
 jobs:
@@ -7,21 +7,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build
+      - name: Build dylib
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
           clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -framework UIKit -o QunarJBBypass.dylib Tweak.m
           ls -la QunarJBBypass.dylib
 
-      - name: Package
+      - name: Package DEB
         run: |
-          mkdir -p pkg/Library/MobileSubstrate/DynamicLibraries
-          cp QunarJBBypass.dylib pkg/Library/MobileSubstrate/DynamicLibraries/
-          echo '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array><key>Executables</key><array><string>QunariPhone_Cook_CM</string></array></dict></dict></plist>' > pkg/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist
-          tar czf QunarJBBypass.tar.gz pkg/
+          mkdir -p deb/DEBIAN
+          mkdir -p deb/var/jb/Library/MobileSubstrate/DynamicLibraries
+          
+          cp QunarJBBypass.dylib deb/var/jb/Library/MobileSubstrate/DynamicLibraries/
+          
+          # plist in NeXTSTEP format
+          echo '{Filter={Bundles=("com.qunar.iphoneclient8");};}' > deb/var/jb/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist
+          
+          # control file
+          echo 'Package: com.qunar.bypass
+          Name: QunarJBBypass
+          Version: 1.0
+          Architecture: iphoneos-arm64
+          Description: Qunar jailbreak bypass
+          Maintainer: qunar
+          Section: Tweaks' > deb/DEBIAN/control
+          
+          # postinst
+          echo '#!/bin/sh
+          chmod 755 /var/jb/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.dylib
+          killall -9 QunariPhone_Cook_CM 2>/dev/null
+          echo "QunarJBBypass installed"
+          exit 0' > deb/DEBIAN/postinst
+          chmod +x deb/DEBIAN/postinst
+          
+          # Build deb
+          brew install dpkg 2>/dev/null || true
+          dpkg-deb --root-owner-group -b deb QunarJBBypass.deb
+          ls -la QunarJBBypass.deb
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: QunarJBBypass
-          path: QunarJBBypass.tar.gz
+          name: QunarJBBypass.deb
+          path: QunarJBBypass.deb
