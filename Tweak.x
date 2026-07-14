@@ -1,15 +1,13 @@
 // ================================================================
-//  去哪儿 Qunar 越狱屏蔽 Tweak v5.0
-//  [文件层] NSFileManager 隐藏越狱路径
-//  [网络层] NSURLSession 拦截 Q-* 请求头
-//  不干扰任何注入模块
-// ================================================================
+//  鍘诲摢鍎?Qunar 瓒婄嫳灞忚斀 Tweak v5.0
+//  [鏂囦欢灞俔 NSFileManager 闅愯棌瓒婄嫳璺緞
+//  [缃戠粶灞俔 NSURLSession 鎷︽埅 Q-* 璇锋眰澶?//  涓嶅共鎵颁换浣曟敞鍏ユā鍧?// ================================================================
 
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
 
 // ================================================================
-// 文件层: 隐藏越狱独有路径
+// 鏂囦欢灞? 闅愯棌瓒婄嫳鐙湁璺緞
 // ================================================================
 static BOOL isJailbreakPath(NSString *path) {
     if (!path) return NO;
@@ -45,7 +43,7 @@ static BOOL hook_fileExistsAtPathIsDir(id self, SEL _cmd, NSString *path, BOOL *
 }
 
 // ================================================================
-// 环境变量清理
+// 鐜鍙橀噺娓呯悊
 // ================================================================
 static NSDictionary* (*orig_environment)(id, SEL);
 static NSDictionary* hook_environment(id self, SEL _cmd) {
@@ -58,12 +56,11 @@ static NSDictionary* hook_environment(id self, SEL _cmd) {
 }
 
 // ================================================================
-// 网络层: 拦截 Q-* 请求头 (检测上报)
+// 缃戠粶灞? 鎷︽埅 Q-* 璇锋眰澶?(妫€娴嬩笂鎶?
 // ================================================================
 
-// 已知的 Qunar 自定义 Header 前缀 (182处)
-// Q-W-*, Q-R-*, Q-Device-*, Q-Env-* 等可能包含越狱标记
-static NSArray *suspiciousHeaderPrefixes(void) {
+// 宸茬煡鐨?Qunar 鑷畾涔?Header 鍓嶇紑 (182澶?
+// Q-W-*, Q-R-*, Q-Device-*, Q-Env-* 绛夊彲鑳藉寘鍚秺鐙辨爣璁?static NSArray *suspiciousHeaderPrefixes(void) {
     return @[@"Q-Device", @"Q-Env", @"Q-Root", @"Q-Jail", @"Q-Tamper",
              @"Q-Sign", @"Q-Secure", @"Q-Verify", @"Q-Check", @"Q-Detect",
              @"Q-Risk", @"Q-Trust"];
@@ -75,7 +72,7 @@ static BOOL isSuspiciousHeader(NSString *field) {
             return YES;
         }
     }
-    // 也检查包含 jail/root/tamper 的任意 header
+    // 涔熸鏌ュ寘鍚?jail/root/tamper 鐨勪换鎰?header
     NSString *lower = [field lowercaseString];
     if ([lower containsString:@"jail"] || [lower containsString:@"root"] ||
         [lower containsString:@"tamper"] || [lower containsString:@"inject"]) {
@@ -89,12 +86,12 @@ static void (*orig_setValue_forHTTPHeaderField)(id, SEL, NSString*, NSString*);
 static void hook_setValue_forHTTPHeaderField(id self, SEL _cmd, NSString *value, NSString *field) {
     if (isSuspiciousHeader(field)) {
         NSLog(@"[QNBypass] Dropped header: %@", field);
-        return; // 不设置这个 header
+        return; // 涓嶈缃繖涓?header
     }
     orig_setValue_forHTTPHeaderField(self, _cmd, value, field);
 }
 
-// Hook NSURLRequest allHTTPHeaderFields (只读返回时过滤)
+// Hook NSURLRequest allHTTPHeaderFields (鍙杩斿洖鏃惰繃婊?
 static NSDictionary* (*orig_allHTTPHeaderFields)(id, SEL);
 static NSDictionary* hook_allHTTPHeaderFields(id self, SEL _cmd) {
     NSDictionary *headers = orig_allHTTPHeaderFields(self, _cmd);
@@ -120,13 +117,13 @@ static void hook_addValue(id self, SEL _cmd, NSString *value, NSString *field) {
 }
 
 // ================================================================
-// 初始化
-// ================================================================
-%ctor {
+// 鍒濆鍖?// ================================================================
+__attribute__((constructor))
+static void init() {
     @autoreleasepool {
-        NSLog(@"[QNBypass] v5.0 已激活: 文件+网络双屏蔽");
+        NSLog(@"[QNBypass] v5.0 宸叉縺娲? 鏂囦欢+缃戠粶鍙屽睆钄?);
         
-        // --- 文件层 ---
+        // --- 鏂囦欢灞?---
         Class NSFM = NSClassFromString(@"NSFileManager");
         if (NSFM) {
             Method m1 = class_getInstanceMethod(NSFM, @selector(fileExistsAtPath:));
@@ -137,7 +134,7 @@ static void hook_addValue(id self, SEL _cmd, NSString *value, NSString *field) {
                       method_setImplementation(m2, (IMP)hook_fileExistsAtPathIsDir); }
         }
         
-        // --- 环境变量 ---
+        // --- 鐜鍙橀噺 ---
         Class NSPI = NSClassFromString(@"NSProcessInfo");
         if (NSPI) {
             Method m = class_getInstanceMethod(NSPI, @selector(environment));
@@ -145,7 +142,7 @@ static void hook_addValue(id self, SEL _cmd, NSString *value, NSString *field) {
                      method_setImplementation(m, (IMP)hook_environment); }
         }
         
-        // --- 网络层 ---
+        // --- 缃戠粶灞?---
         Class NSMUR = NSClassFromString(@"NSMutableURLRequest");
         if (NSMUR) {
             Method sm = class_getInstanceMethod(NSMUR, @selector(setValue:forHTTPHeaderField:));
