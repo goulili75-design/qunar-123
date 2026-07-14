@@ -1,199 +1,113 @@
-// ================================================================
-//  鍘诲摢鍎?Qunar 瓒婄嫳灞忚斀 Tweak v5.1
-//  [鏂囦欢灞俔 NSFileManager 闅愯棌瓒婄嫳璺緞
-//  [缃戠粶灞俔 NSURLSession 鎷︽埅 Q-* 璇锋眰澶?//  [璁惧灞俔 UIDevice + IDFV 闃叉媺榛?//  涓嶅共鎵颁换浣曟敞鍏ユā鍧?// ================================================================
-
+// Qunar Bypass v6.0 - Full device spoofing
 #import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-// ================================================================
-// 鏂囦欢灞? 闅愯棌瓒婄嫳鐙湁璺緞
-// ================================================================
-static BOOL isJailbreakPath(NSString *path) {
+// File paths to hide
+static BOOL isJB(NSString *path) {
     if (!path) return NO;
-    NSString *lower = [path lowercaseString];
-    if ([lower hasPrefix:@"/var/jb"]) return YES;
-    if ([lower hasPrefix:@"/etc/apt"]) return YES;
-    if ([lower hasPrefix:@"/var/lib/dpkg"]) return YES;
-    if ([lower hasPrefix:@"/var/lib/apt"]) return YES;
-    if ([lower hasPrefix:@"/library/mobilesubstrate"]) return YES;
-    if ([lower hasPrefix:@"/library/tweakinject"]) return YES;
-    if ([lower containsString:@"cydia.app"]) return YES;
-    if ([lower containsString:@"sileo.app"]) return YES;
-    if ([lower containsString:@"dopamine.app"]) return YES;
-    if ([lower containsString:@"zebra.app"]) return YES;
-    if ([lower containsString:@"/.bootstrapped"]) return YES;
-    if ([lower containsString:@"/.cydia_no_stash"]) return YES;
-    if ([lower containsString:@"/.installed_dopamine"]) return YES;
-    if ([lower containsString:@"/usr/sbin/sshd"]) return YES;
-    if ([lower containsString:@"/bin/bash"]) return YES;
+    NSString *l = [path lowercaseString];
+    if ([l hasPrefix:@"/var/jb"] || [l hasPrefix:@"/etc/apt"] || [l hasPrefix:@"/var/lib/dpkg"]) return YES;
+    if ([l containsString:@"cydia.app"] || [l containsString:@"sileo.app"] || [l containsString:@"dopamine.app"]) return YES;
+    if ([l containsString:@"/.bootstrapped"] || [l containsString:@"/.cydia_no_stash"]) return YES;
+    if ([l containsString:@"/usr/sbin/sshd"] || [l containsString:@"/bin/bash"]) return YES;
     return NO;
 }
 
-static BOOL (*orig_fileExistsAtPath)(id, SEL, NSString*);
-static BOOL hook_fileExistsAtPath(id self, SEL _cmd, NSString *path) {
-    if (isJailbreakPath(path)) return NO;
-    return orig_fileExistsAtPath(self, _cmd, path);
+// NSFileManager hooks
+static BOOL (*orig_fep)(id, SEL, NSString*);
+static BOOL hook_fep(id self, SEL _cmd, NSString *p) { return isJB(p) ? NO : orig_fep(self, _cmd, p); }
+static BOOL (*orig_fepd)(id, SEL, NSString*, BOOL*);
+static BOOL hook_fepd(id self, SEL _cmd, NSString *p, BOOL *d) { if(isJB(p)){if(d)*d=NO;return NO;} return orig_fepd(self,_cmd,p,d); }
+
+// NSProcessInfo
+static NSDictionary* (*orig_env)(id, SEL);
+static NSDictionary* hook_env(id self, SEL _cmd) { NSMutableDictionary *m = [[orig_env(self,_cmd) mutableCopy] autorelease]; [m removeObjectForKey:@"DYLD_INSERT_LIBRARIES"]; return m; }
+
+// HTTP Header filter
+static BOOL badHeader(NSString *f) {
+    NSString *l = [f lowercaseString];
+    return [l containsString:@"jail"] || [l containsString:@"root"] || [l containsString:@"tamper"] || [l containsString:@"inject"];
 }
+static void (*orig_svh)(id, SEL, NSString*, NSString*);
+static void hook_svh(id self, SEL _cmd, NSString *v, NSString *f) { if(!badHeader(f)) orig_svh(self,_cmd,v,f); }
+static NSDictionary* (*orig_ahf)(id, SEL);
+static NSDictionary* hook_ahf(id self, SEL _cmd) { NSMutableDictionary *d = [[orig_ahf(self,_cmd) mutableCopy] autorelease]; for(NSString *k in orig_ahf(self,_cmd)) if(badHeader(k)) [d removeObjectForKey:k]; return d; }
+static void (*orig_av)(id, SEL, NSString*, NSString*);
+static void hook_av(id self, SEL _cmd, NSString *v, NSString *f) { if(!badHeader(f)) orig_av(self,_cmd,v,f); }
 
-static BOOL (*orig_fileExistsAtPathIsDir)(id, SEL, NSString*, BOOL*);
-static BOOL hook_fileExistsAtPathIsDir(id self, SEL _cmd, NSString *path, BOOL *isDir) {
-    if (isJailbreakPath(path)) { if (isDir) *isDir = NO; return NO; }
-    return orig_fileExistsAtPathIsDir(self, _cmd, path, isDir);
-}
-
-// ================================================================
-// 鐜鍙橀噺娓呯悊
-// ================================================================
-static NSDictionary* (*orig_environment)(id, SEL);
-static NSDictionary* hook_environment(id self, SEL _cmd) {
-    NSDictionary *env = orig_environment(self, _cmd);
-    if (!env) return env;
-    NSMutableDictionary *m = [env mutableCopy];
-    [m removeObjectForKey:@"DYLD_INSERT_LIBRARIES"];
-    [m removeObjectForKey:@"DYLD_LIBRARY_PATH"];
-    return m;
-}
-
-// ================================================================
-// 缃戠粶灞? 鎷︽埅 Q-* 璇锋眰澶?(妫€娴嬩笂鎶?
-// ================================================================
-
-// Known Qunar custom header prefixes (~182 instances)
-// Q-Device-*, Q-Env-* etc may contain jailbreak markers
-static NSArray *suspiciousHeaderPrefixes(void) {
-    return [NSArray arrayWithObjects:
-            @"Q-Device", @"Q-Env", @"Q-Root", @"Q-Jail", @"Q-Tamper",
-            @"Q-Sign", @"Q-Secure", @"Q-Verify", @"Q-Check", @"Q-Detect",
-            @"Q-Risk", @"Q-Trust", nil];
-}
-
-static BOOL isSuspiciousHeader(NSString *field) {
-    for (NSString *prefix in suspiciousHeaderPrefixes()) {
-        if ([field hasPrefix:prefix] || [field caseInsensitiveCompare:prefix] == NSOrderedSame) {
-            return YES;
-        }
-    }
-    // 涔熸鏌ュ寘鍚?jail/root/tamper 鐨勪换鎰?header
-    NSString *lower = [field lowercaseString];
-    if ([lower containsString:@"jail"] || [lower containsString:@"root"] ||
-        [lower containsString:@"tamper"] || [lower containsString:@"inject"]) {
-        return YES;
-    }
-    return NO;
-}
-
-// Hook NSMutableURLRequest setValue:forHTTPHeaderField:
-static void (*orig_setValue_forHTTPHeaderField)(id, SEL, NSString*, NSString*);
-static void hook_setValue_forHTTPHeaderField(id self, SEL _cmd, NSString *value, NSString *field) {
-    if (isSuspiciousHeader(field)) {
-        NSLog(@"[QNBypass] Dropped header: %@", field);
-        return; // 涓嶈缃繖涓?header
-    }
-    orig_setValue_forHTTPHeaderField(self, _cmd, value, field);
-}
-
-// Hook NSURLRequest allHTTPHeaderFields (鍙杩斿洖鏃惰繃婊?
-static NSDictionary* (*orig_allHTTPHeaderFields)(id, SEL);
-static NSDictionary* hook_allHTTPHeaderFields(id self, SEL _cmd) {
-    NSDictionary *headers = orig_allHTTPHeaderFields(self, _cmd);
-    if (!headers) return headers;
-    NSMutableDictionary *filtered = [headers mutableCopy];
-    for (NSString *key in headers) {
-        if (isSuspiciousHeader(key)) {
-            [filtered removeObjectForKey:key];
-            NSLog(@"[QNBypass] Filtered from response: %@", key);
-        }
-    }
-    return filtered;
-}
-
-// Hook NSMutableURLRequest addValue:forHTTPHeaderField:
-static void (*orig_addValue)(id, SEL, NSString*, NSString*);
-static void hook_addValue(id self, SEL _cmd, NSString *value, NSString *field) {
-    if (isSuspiciousHeader(field)) {
-        NSLog(@"[QNBypass] Dropped addValue: %@", field);
-        return;
-    }
-    orig_addValue(self, _cmd, value, field);
-}
-
-// Device spoofing: prevent server-side blacklisting
+// UIDevice spoofing
 static NSString* (*orig_idfv)(id, SEL);
-static NSString* hook_idfv(id self, SEL _cmd) {
-    // Return random IDFV each time (prevents device tracking)
-    return [[NSUUID UUID] UUIDString];
+static NSString* hook_idfv(id self, SEL _cmd) { return [[NSUUID UUID] UUIDString]; }
+static NSString* (*orig_name)(id, SEL);
+static NSString* hook_name(id self, SEL _cmd) { return @"iPhone"; }
+static NSString* (*orig_model)(id, SEL);
+static NSString* hook_model(id self, SEL _cmd) { return @"iPhone"; }
+
+// UIScreen spoofing
+static CGRect (*orig_bounds)(id, SEL);
+static CGRect hook_bounds(id self, SEL _cmd) { return CGRectMake(0,0,390,844); }
+static CGFloat (*orig_scale)(id, SEL);
+static CGFloat hook_scale(id self, SEL _cmd) { return 3.0; }
+
+// NSFileManager disk space
+static NSDictionary* (*orig_fsa)(id, SEL, NSString*);
+static NSDictionary* hook_fsa(id self, SEL _cmd, NSString *p) {
+    NSMutableDictionary *d = [[orig_fsa(self,_cmd,p) mutableCopy] autorelease];
+    if(d) { d[NSFileSystemFreeSize]=@(100000000000LL); d[NSFileSystemSize]=@(256000000000LL); }
+    return d;
 }
 
-static NSString* (*orig_deviceName)(id, SEL);
-static NSString* hook_deviceName(id self, SEL _cmd) {
-    return @"iPhone";  // Generic name
-}
+// NSProcessInfo system info
+static NSString* (*orig_host)(id, SEL);
+static NSString* hook_host(id self, SEL _cmd) { return @"iPhone"; }
 
-static NSString* (*orig_deviceModel)(id, SEL);
-static NSString* hook_deviceModel(id self, SEL _cmd) {
-    return @"iPhone";  // Don't expose exact model
-}
-
-// ================================================================
-// 鍒濆鍖?// ================================================================
 __attribute__((constructor))
 static void init() {
     @autoreleasepool {
-        NSLog(@"[QNBypass] v5.0 active: file + network shield");
-        
-        // --- 鏂囦欢灞?---
         Class NSFM = NSClassFromString(@"NSFileManager");
         if (NSFM) {
-            Method m1 = class_getInstanceMethod(NSFM, @selector(fileExistsAtPath:));
-            if (m1) { orig_fileExistsAtPath = (void*)method_getImplementation(m1);
-                      method_setImplementation(m1, (IMP)hook_fileExistsAtPath); }
-            Method m2 = class_getInstanceMethod(NSFM, @selector(fileExistsAtPath:isDirectory:));
-            if (m2) { orig_fileExistsAtPathIsDir = (void*)method_getImplementation(m2);
-                      method_setImplementation(m2, (IMP)hook_fileExistsAtPathIsDir); }
+            Method m = class_getInstanceMethod(NSFM, @selector(fileExistsAtPath:));
+            if(m){orig_fep=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_fep);}
+            m = class_getInstanceMethod(NSFM, @selector(fileExistsAtPath:isDirectory:));
+            if(m){orig_fepd=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_fepd);}
+            m = class_getInstanceMethod(NSFM, @selector(attributesOfFileSystemForPath:error:));
+            if(m){orig_fsa=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_fsa);}
         }
-        
-        // --- 鐜鍙橀噺 ---
         Class NSPI = NSClassFromString(@"NSProcessInfo");
         if (NSPI) {
             Method m = class_getInstanceMethod(NSPI, @selector(environment));
-            if (m) { orig_environment = (void*)method_getImplementation(m);
-                     method_setImplementation(m, (IMP)hook_environment); }
+            if(m){orig_env=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_env);}
+            m = class_getInstanceMethod(NSPI, @selector(hostName));
+            if(m){orig_host=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_host);}
         }
-        
-        // --- 缃戠粶灞?---
         Class NSMUR = NSClassFromString(@"NSMutableURLRequest");
         if (NSMUR) {
-            Method sm = class_getInstanceMethod(NSMUR, @selector(setValue:forHTTPHeaderField:));
-            if (sm) { orig_setValue_forHTTPHeaderField = (void*)method_getImplementation(sm);
-                      method_setImplementation(sm, (IMP)hook_setValue_forHTTPHeaderField); }
-            Method am = class_getInstanceMethod(NSMUR, @selector(addValue:forHTTPHeaderField:));
-            if (am) { orig_addValue = (void*)method_getImplementation(am);
-                      method_setImplementation(am, (IMP)hook_addValue); }
+            Method m = class_getInstanceMethod(NSMUR, @selector(setValue:forHTTPHeaderField:));
+            if(m){orig_svh=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_svh);}
+            m = class_getInstanceMethod(NSMUR, @selector(addValue:forHTTPHeaderField:));
+            if(m){orig_av=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_av);}
         }
-        
         Class NSUR = NSClassFromString(@"NSURLRequest");
         if (NSUR) {
-            Method hm = class_getInstanceMethod(NSUR, @selector(allHTTPHeaderFields));
-            if (hm) { orig_allHTTPHeaderFields = (void*)method_getImplementation(hm);
-                      method_setImplementation(hm, (IMP)hook_allHTTPHeaderFields); }
+            Method m = class_getInstanceMethod(NSUR, @selector(allHTTPHeaderFields));
+            if(m){orig_ahf=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_ahf);}
         }
-        
-        // --- Device spoofing ---
         Class UIDev = NSClassFromString(@"UIDevice");
         if (UIDev) {
-            Method idfv_m = class_getInstanceMethod(UIDev, @selector(identifierForVendor));
-            if (idfv_m) { orig_idfv = (void*)method_getImplementation(idfv_m);
-                          method_setImplementation(idfv_m, (IMP)hook_idfv); }
-            Method name_m = class_getInstanceMethod(UIDev, @selector(name));
-            if (name_m) { orig_deviceName = (void*)method_getImplementation(name_m);
-                          method_setImplementation(name_m, (IMP)hook_deviceName); }
-            Method model_m = class_getInstanceMethod(UIDev, @selector(model));
-            if (model_m) { orig_deviceModel = (void*)method_getImplementation(model_m);
-                           method_setImplementation(model_m, (IMP)hook_deviceModel); }
-            NSLog(@"[QNBypass] UIDevice spoofing active");
+            Method m = class_getInstanceMethod(UIDev, @selector(identifierForVendor));
+            if(m){orig_idfv=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_idfv);}
+            m = class_getInstanceMethod(UIDev, @selector(name));
+            if(m){orig_name=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_name);}
+            m = class_getInstanceMethod(UIDev, @selector(model));
+            if(m){orig_model=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_model);}
         }
-        
-        NSLog(@"[QNBypass] Ready");
+        Class UIScr = NSClassFromString(@"UIScreen");
+        if (UIScr) {
+            Method m = class_getInstanceMethod(UIScr, @selector(bounds));
+            if(m){orig_bounds=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_bounds);}
+            m = class_getInstanceMethod(UIScr, @selector(scale));
+            if(m){orig_scale=(void*)method_getImplementation(m); method_setImplementation(m,(IMP)hook_scale);}
+        }
     }
 }
