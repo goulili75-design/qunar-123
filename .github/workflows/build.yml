@@ -7,25 +7,66 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Theos
+      - name: Compile dylib
         run: |
-          git clone --depth 1 https://github.com/theos/theos.git $HOME/theos
-          echo "THEOS=$HOME/theos" >> $GITHUB_ENV
-          # Xcode SDK
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          ln -sf "$SDK" $HOME/theos/sdks/iPhoneOS16.0.sdk
-          # 瀹夎 dpkg (dm.pl 闇€瑕?
-          brew install dpkg ldid 2>/dev/null || true
-          # 纭繚 perl 妯″潡鍙敤
-          export PATH=$HOME/theos/bin:$PATH
+          clang -arch arm64 -arch arm64e \
+            -isysroot "$SDK" \
+            -miphoneos-version-min=15.0 \
+            -dynamiclib \
+            -framework Foundation -framework UIKit \
+            -o QunarJBBypass.dylib \
+            Tweak.x
+          echo "Dylib compiled"
+          ls -la QunarJBBypass.dylib
 
-      - name: Build Tweak
+      - name: Sign
         run: |
-          export PATH=$HOME/theos/bin:$PATH
-          make package FINALPACKAGE=1
+          brew install ldid 2>/dev/null || true
+          ldid -S QunarJBBypass.dylib
+          echo "Signed"
 
-      - name: Upload deb
+      - name: Package deb
+        run: |
+          brew install dpkg 2>/dev/null || true
+          mkdir -p deb/var/jb/Library/MobileSubstrate/DynamicLibraries
+          cp QunarJBBypass.dylib deb/var/jb/Library/MobileSubstrate/DynamicLibraries/
+          
+          # plist
+          cat > deb/var/jb/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist << 'PLEOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>Filter</key>
+              <dict>
+                  <key>Bundles</key>
+                  <array>
+                      <string>com.qunar.iphoneclient8</string>
+                  </array>
+              </dict>
+          </dict>
+          </plist>
+          PLEOF
+          
+          # control
+          mkdir -p deb/DEBIAN
+          cat > deb/DEBIAN/control << 'EOF'
+          Package: com.qunarjbb
+          Name: QunarJBBypass
+          Version: 1.0
+          Architecture: iphoneos-arm64
+          Description: Qunar jailbreak bypass
+          Maintainer: qunar
+          Section: Tweaks
+          EOF
+          
+          dpkg-deb -b deb QunarJBBypass.deb
+          echo "DEB created"
+          ls -la QunarJBBypass.deb
+
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: QunarJBBypass.deb
-          path: packages/*.deb
+          path: QunarJBBypass.deb
