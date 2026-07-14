@@ -1,7 +1,7 @@
 // ================================================================
-//  鍘诲摢鍎?Qunar 瓒婄嫳灞忚斀 Tweak v5.0
+//  鍘诲摢鍎?Qunar 瓒婄嫳灞忚斀 Tweak v5.1
 //  [鏂囦欢灞俔 NSFileManager 闅愯棌瓒婄嫳璺緞
-//  [缃戠粶灞俔 NSURLSession 鎷︽埅 Q-* 璇锋眰澶?//  涓嶅共鎵颁换浣曟敞鍏ユā鍧?// ================================================================
+//  [缃戠粶灞俔 NSURLSession 鎷︽埅 Q-* 璇锋眰澶?//  [璁惧灞俔 UIDevice + IDFV 闃叉媺榛?//  涓嶅共鎵颁换浣曟敞鍏ユā鍧?// ================================================================
 
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
@@ -118,6 +118,23 @@ static void hook_addValue(id self, SEL _cmd, NSString *value, NSString *field) {
     orig_addValue(self, _cmd, value, field);
 }
 
+// Device spoofing: prevent server-side blacklisting
+static NSString* (*orig_idfv)(id, SEL);
+static NSString* hook_idfv(id self, SEL _cmd) {
+    // Return random IDFV each time (prevents device tracking)
+    return [[NSUUID UUID] UUIDString];
+}
+
+static NSString* (*orig_deviceName)(id, SEL);
+static NSString* hook_deviceName(id self, SEL _cmd) {
+    return @"iPhone";  // Generic name
+}
+
+static NSString* (*orig_deviceModel)(id, SEL);
+static NSString* hook_deviceModel(id self, SEL _cmd) {
+    return @"iPhone";  // Don't expose exact model
+}
+
 // ================================================================
 // 鍒濆鍖?// ================================================================
 __attribute__((constructor))
@@ -160,6 +177,21 @@ static void init() {
             Method hm = class_getInstanceMethod(NSUR, @selector(allHTTPHeaderFields));
             if (hm) { orig_allHTTPHeaderFields = (void*)method_getImplementation(hm);
                       method_setImplementation(hm, (IMP)hook_allHTTPHeaderFields); }
+        }
+        
+        // --- Device spoofing ---
+        Class UIDev = NSClassFromString(@"UIDevice");
+        if (UIDev) {
+            Method idfv_m = class_getInstanceMethod(UIDev, @selector(identifierForVendor));
+            if (idfv_m) { orig_idfv = (void*)method_getImplementation(idfv_m);
+                          method_setImplementation(idfv_m, (IMP)hook_idfv); }
+            Method name_m = class_getInstanceMethod(UIDev, @selector(name));
+            if (name_m) { orig_deviceName = (void*)method_getImplementation(name_m);
+                          method_setImplementation(name_m, (IMP)hook_deviceName); }
+            Method model_m = class_getInstanceMethod(UIDev, @selector(model));
+            if (model_m) { orig_deviceModel = (void*)method_getImplementation(model_m);
+                           method_setImplementation(model_m, (IMP)hook_deviceModel); }
+            NSLog(@"[QNBypass] UIDevice spoofing active");
         }
         
         NSLog(@"[QNBypass] Ready");
