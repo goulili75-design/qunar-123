@@ -9,10 +9,24 @@ jobs:
 
       - name: Build
         run: |
+          # Use older SDK if available, or set explicit target
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -o QunarJBBypass.dylib Tweak.m
-          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -o Bare.dylib Bare.m
-          ls -la QunarJBBypass.dylib Bare.dylib
+          echo "SDK: $SDK"
+          # Force deployment target to 15.0 and disable some newer features
+          clang -arch arm64 -isysroot "$SDK" \
+            -miphoneos-version-min=15.0 \
+            -target arm64-apple-ios15.0 \
+            -dynamiclib \
+            -fno-objc-msgsend-selector-stubs \
+            -fobjc-arc \
+            -framework Foundation \
+            -o QunarJBBypass.dylib Tweak.m
+          clang -arch arm64 -isysroot "$SDK" \
+            -miphoneos-version-min=15.0 \
+            -target arm64-apple-ios15.0 \
+            -dynamiclib \
+            -o Bare.dylib Bare.m
+          ls -la *.dylib
 
       - name: Upload Dylibs
         uses: actions/upload-artifact@v4
