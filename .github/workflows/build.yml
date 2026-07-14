@@ -7,44 +7,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Bypass Tweak
+      - name: Build
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
           clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -framework UIKit -o QunarJBBypass.dylib Tweak.m
-          echo "Bypass OK"
-
-      - name: Build Spy Tweak  
-        run: |
-          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -framework UIKit  -o QunarSpy.dylib Spy.m
-          echo "Spy OK"
+          ls -la QunarJBBypass.dylib
 
       - name: Package
         run: |
-          mkdir -p QunarBypass/Library/MobileSubstrate/DynamicLibraries
-          cp QunarJBBypass.dylib QunarBypass/Library/MobileSubstrate/DynamicLibraries/
-          cp QunarSpy.dylib QunarBypass/Library/MobileSubstrate/DynamicLibraries/
-          echo '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array><key>Executables</key><array><string>QunariPhone_Cook_CM</string></array></dict></dict></plist>' > QunarBypass/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist
-          cp QunarBypass/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist QunarBypass/Library/MobileSubstrate/DynamicLibraries/QunarSpy.plist
-          cat > QunarBypass/reset.sh << 'EOF'
-#!/bin/sh
-echo "[Reset] Clearing Qunar data..."
-find /var/mobile/Containers/Data/Application -name "*.metadata.plist" 2>/dev/null | while read f; do
-  if grep -q qunar "$f" 2>/dev/null; then
-    d=$(dirname "$f")
-    rm -rf "$d"
-    echo "Removed: $d"
-  fi
-done
-sqlite3 /var/keybags/backup.db "DELETE FROM cert WHERE labl LIKE '%qunar%';" 2>/dev/null
-killall -9 QunariPhone_Cook_CM 2>/dev/null
-echo "Done"
-EOF
-          chmod +x QunarBypass/reset.sh
-          tar czf QunarBypass.tar.gz QunarBypass/
+          mkdir -p pkg/Library/MobileSubstrate/DynamicLibraries
+          cp QunarJBBypass.dylib pkg/Library/MobileSubstrate/DynamicLibraries/
+          echo '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array><key>Executables</key><array><string>QunariPhone_Cook_CM</string></array></dict></dict></plist>' > pkg/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist
+          tar czf QunarJBBypass.tar.gz pkg/
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: QunarBypass
-          path: QunarBypass.tar.gz
+          name: QunarJBBypass
+          path: QunarJBBypass.tar.gz
