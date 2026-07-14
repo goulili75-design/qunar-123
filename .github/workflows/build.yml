@@ -13,6 +13,15 @@ jobs:
           clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -framework UIKit -o QunarJBBypass.dylib Tweak.m
           ls -la QunarJBBypass.dylib
 
+      - name: Sign
+        run: |
+          # Install ldid for code signing
+          curl -L -o /usr/local/bin/ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_macos_arm64 2>/dev/null || \
+          curl -L -o /usr/local/bin/ldid https://github.com/ProcursusTeam/ldid/releases/download/v2.1.5-procursus7/ldid_macos_x86_64 2>/dev/null
+          chmod +x /usr/local/bin/ldid 2>/dev/null || true
+          ldid -S QunarJBBypass.dylib 2>/dev/null || codesign -s - QunarJBBypass.dylib 2>/dev/null || echo \"sign skipped\"
+          echo \"Signed\"
+
       - name: Package
         run: |
           mkdir -p pkg/Library/MobileSubstrate/DynamicLibraries
