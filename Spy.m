@@ -1,4 +1,4 @@
-// Qunar Spy - Log ALL device parameters collected by the app
+// Qunar Spy - Log ALL device parameters
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
