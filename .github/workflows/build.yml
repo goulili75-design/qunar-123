@@ -7,30 +7,64 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile
+      - name: Build Tweak dylib
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -arch arm64 \
-            -isysroot "$SDK" \
-            -miphoneos-version-min=15.0 \
-            -dynamiclib \
-            -fobjc-arc \
-            -framework Foundation \
-            -o QunarJBBypass.dylib \
-            Tweak.m 2>&1
-          echo "EXIT: $?"
-          ls -la QunarJBBypass.dylib 2>/dev/null || echo "FAILED"
+          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -fobjc-arc -framework Foundation -o QunarJBBypass.dylib Tweak.m
+          echo "Tweak OK"
+          ls -la QunarJBBypass.dylib
 
-      - name: Package
-        if: success()
+      - name: Build App
         run: |
-          mkdir -p QunarJBBypass/Library/MobileSubstrate/DynamicLibraries
-          cp QunarJBBypass.dylib QunarJBBypass/Library/MobileSubstrate/DynamicLibraries/
-          echo '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array></dict></dict></plist>' > QunarJBBypass/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist
-          tar czf QunarJBBypass.tar.gz QunarJBBypass/
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          mkdir -p QunarTool.app
+          clang -arch arm64 -isysroot "$SDK" -miphoneos-version-min=15.0 -fobjc-arc -framework UIKit -framework Foundation -o QunarTool.app/QunarTool QunarTool/main.m
+          cp QunarTool/Info.plist QunarTool.app/
+          echo "App OK"
+          ls -la QunarTool.app/
+
+      - name: Sign
+        run: |
+          ldid -S QunarTool.app/QunarTool 2>/dev/null || echo "sign skipped"
+          ldid -S QunarJBBypass.dylib 2>/dev/null || echo "sign skipped"
+
+      - name: Package DEB
+        run: |
+          mkdir -p deb/DEBIAN
+          mkdir -p deb/Library/MobileSubstrate/DynamicLibraries
+          mkdir -p deb/Applications/QunarTool.app
+          
+          # Tweak
+          cp QunarJBBypass.dylib deb/Library/MobileSubstrate/DynamicLibraries/
+          echo '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array><key>Executables</key><array><string>QunariPhone_Cook_CM</string></array></dict></dict></plist>' > deb/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist
+
+          # App
+          cp -r QunarTool.app/* deb/Applications/QunarTool.app/
+          
+          # Control
+          echo 'Package: com.qunar.bypass
+          Name: QunarJBBypass
+          Version: 1.0
+          Architecture: iphoneos-arm64
+          Description: Qunar jailbreak bypass + device spoofer + cleaner
+          Maintainer: qunar
+          Section: Tweaks
+          Depends: firmware (>= 15.0)' > deb/DEBIAN/control
+          
+          # Post-install script
+          echo '#!/bin/sh
+          uicache -r 2>/dev/null
+          killall -9 QunariPhone_Cook_CM 2>/dev/null
+          echo "QunarJBBypass installed. Open QunarTool app to manage."
+          exit 0' > deb/DEBIAN/postinst
+          chmod +x deb/DEBIAN/postinst
+          
+          # Build deb
+          dpkg-deb -b deb QunarJBBypass.deb
+          ls -la QunarJBBypass.deb
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: QunarJBBypass
-          path: QunarJBBypass.tar.gz
+          name: QunarJBBypass.deb
+          path: QunarJBBypass.deb
