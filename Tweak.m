@@ -59,8 +59,9 @@ static NSDictionary* hook_environment(id self, SEL _cmd) {
 // 缃戠粶灞? 鎷︽埅 Q-* 璇锋眰澶?(妫€娴嬩笂鎶?
 // ================================================================
 
-// 宸茬煡鐨?Qunar 鑷畾涔?Header 鍓嶇紑 (182澶?
-// Q-W-*, Q-R-*, Q-Device-*, Q-Env-* 绛夊彲鑳藉寘鍚秺鐙辨爣璁?static NSArray *suspiciousHeaderPrefixes(void) {
+// Known Qunar custom header prefixes (~182 instances)
+// Q-Device-*, Q-Env-* etc may contain jailbreak markers
+static NSArray *suspiciousHeaderPrefixes(void) {
     return [NSArray arrayWithObjects:
             @"Q-Device", @"Q-Env", @"Q-Root", @"Q-Jail", @"Q-Tamper",
             @"Q-Sign", @"Q-Secure", @"Q-Verify", @"Q-Check", @"Q-Detect",
