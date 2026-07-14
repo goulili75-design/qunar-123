@@ -17,7 +17,7 @@ jobs:
             -miphoneos-version-min=15.0 \
             -target arm64-apple-ios15.0 \
             -dynamiclib \
-            -fno-objc-msgsend-selector-stubs \
+            -install_name @executable_path/QunarJBBypass.dylib \
             -fobjc-arc \
             -framework Foundation \
             -o QunarJBBypass.dylib Tweak.m
@@ -25,6 +25,7 @@ jobs:
             -miphoneos-version-min=15.0 \
             -target arm64-apple-ios15.0 \
             -dynamiclib \
+            -install_name @executable_path/Bare.dylib \
             -o Bare.dylib Bare.m
           ls -la *.dylib
 
