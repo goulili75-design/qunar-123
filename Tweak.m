@@ -65,6 +65,8 @@ static void doHooks(){
 
 __attribute__((constructor))
 static void init(){
-    LOG(@"Loaded - deferring hooks to after launch");
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 500*NSEC_PER_MSEC), dispatch_get_main_queue(), ^{ doHooks(); });
+    LOG(@"Loaded - will setup after app ready");
+    // Listen for app launch notification, then hook
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification
+        object:nil queue:nil usingBlock:^(NSNotification *n){ doHooks(); }];
 }
