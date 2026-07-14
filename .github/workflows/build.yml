@@ -11,14 +11,13 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/theos/theos.git $HOME/theos
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
-          # 下载 SDK
-          curl -L -o $HOME/theos/sdks/iPhoneOS16.0.sdk.tar.xz \
-            https://github.com/theos/sdks/releases/download/master/iPhoneOS16.0.sdk.tar.xz
-          cd $HOME/theos/sdks && tar -xf iPhoneOS16.0.sdk.tar.xz
+          # 鐢?Xcode 鑷甫 SDK锛屼笉闇€瑕佸崟鐙笅杞?          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          echo "SDK=$SDK"
+          ln -sf "$SDK" $HOME/theos/sdks/iPhoneOS16.0.sdk 2>/dev/null || true
+          ls $HOME/theos/sdks/
 
-      - name: Build Tweak  
+      - name: Build Tweak
         run: |
-          sed -i '' 's/latest/16.0/' Makefile
           make package FINALPACKAGE=1
 
       - name: Upload deb
