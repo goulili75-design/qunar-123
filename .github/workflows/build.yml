@@ -7,62 +7,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile dylib
+      - name: Compile
         run: |
           SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -arch arm64 -arch arm64e \
-            -isysroot "$SDK" \
-            -miphoneos-version-min=15.0 \
-            -dynamiclib \
-            -framework Foundation -framework UIKit \
-            -o QunarJBBypass.dylib \
-            Tweak.x
-          echo "Dylib compiled"
-          ls -la QunarJBBypass.dylib
+          clang -arch arm64 -arch arm64e -isysroot "$SDK" -miphoneos-version-min=15.0 -dynamiclib -framework Foundation -framework UIKit -lobjc -o QunarJBBypass.dylib Tweak.x
+          file QunarJBBypass.dylib
 
-      - name: Sign
+      - name: Package
         run: |
-          brew install ldid 2>/dev/null || true
+          brew install ldid dpkg || true
           ldid -S QunarJBBypass.dylib
-          echo "Signed"
-
-      - name: Package deb
-        run: |
-          brew install dpkg 2>/dev/null || true
-          mkdir -p deb/var/jb/Library/MobileSubstrate/DynamicLibraries
-          cp QunarJBBypass.dylib deb/var/jb/Library/MobileSubstrate/DynamicLibraries/
-          
-          # plist
-          cat > deb/var/jb/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist << 'PLEOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>Filter</key>
-              <dict>
-                  <key>Bundles</key>
-                  <array>
-                      <string>com.qunar.iphoneclient8</string>
-                  </array>
-              </dict>
-          </dict>
-          </plist>
-          PLEOF
-          
-          # control
-          mkdir -p deb/DEBIAN
-          cat > deb/DEBIAN/control << 'EOF'
-          Package: com.qunarjbb
-          Name: QunarJBBypass
-          Version: 1.0
-          Architecture: iphoneos-arm64
-          Description: Qunar jailbreak bypass
-          Maintainer: qunar
-          Section: Tweaks
-          EOF
-          
-          dpkg-deb -b deb QunarJBBypass.deb
-          echo "DEB created"
+          mkdir -p pkg/Library/MobileSubstrate/DynamicLibraries pkg/DEBIAN
+          cp QunarJBBypass.dylib pkg/Library/MobileSubstrate/DynamicLibraries/
+          python3 -c "
+          plist='''<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict><key>Filter</key><dict><key>Bundles</key><array><string>com.qunar.iphoneclient8</string></array></dict></dict>\n</plist>'''
+          open('pkg/Library/MobileSubstrate/DynamicLibraries/QunarJBBypass.plist','w').write(plist)
+          "
+          python3 -c "
+          control='Package: com.qunarjbb\nName: QunarJBBypass\nVersion: 1.0\nArchitecture: iphoneos-arm64\nDescription: Qunar jailbreak bypass\nMaintainer: qunar\nSection: Tweaks\n'
+          open('pkg/DEBIAN/control','w').write(control)
+          "
+          dpkg-deb -b pkg QunarJBBypass.deb
           ls -la QunarJBBypass.deb
 
       - name: Upload
